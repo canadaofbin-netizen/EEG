@@ -19,8 +19,8 @@
 8. [Evaluation & Statistical Analysis Plan](#8-evaluation--statistical-analysis-plan)
 9. [Risk Analysis & Mitigation](#9-risk-analysis--mitigation)
 10. [Computational Environment](#10-computational-environment)
-- [Appendix A: Methodological Foundations of Preprocessing Pipeline](#appendix-a-methodological-foundations-of-preprocessing-pipeline)
-- [Appendix B: Literature References](#appendix-b-literature-references)
+- [Appendix: Methodological Foundations of Preprocessing Pipeline](#appendix-methodological-foundations-of-preprocessing-pipeline)
+- [References](#references)
 
 ---
 
@@ -248,7 +248,7 @@ Raw EEG (Continuous)
 ```
 
 > [!NOTE]
-> For complete electrophysiological foundations, mathematical formulations, and literature citations for each preprocessing stage, see [Appendix A: Methodological Foundations of Preprocessing Pipeline](#appendix-a-methodological-foundations-of-preprocessing-pipeline).
+> For complete electrophysiological foundations, mathematical formulations, and literature citations for each preprocessing stage, see [Appendix: Methodological Foundations of Preprocessing Pipeline](#appendix-methodological-foundations-of-preprocessing-pipeline).
 
 ### 5.2 Critical Anti-Patterns to Avoid
 
@@ -540,7 +540,7 @@ scipy>=1.14.0
 
 ---
 
-## Appendix A: Methodological Foundations of Preprocessing Pipeline
+## Appendix: Methodological Foundations of Preprocessing Pipeline
 
 ### A.1 Stage-by-Stage Electrophysiological Foundations & Standards
 
@@ -601,7 +601,7 @@ To prevent reproducibility failures and inflated performance metrics common in E
 
 ---
 
-## Appendix B: Literature References
+## References
 
 ### Datasets
 - Lee, M.-H., Kwon, O.-Y., Kim, Y.-J., Kim, H.-K., Lee, Y.-E., Williamson, J., Fazli, S., & Lee, S.-W. (2019). EEG dataset and OpenBMI toolbox for three BCI paradigms: An investigation into BCI illiteracy. *GigaScience*, 8(5), giz002. [doi:10.1093/gigascience/giz002](https://doi.org/10.1093/gigascience/giz002)
@@ -637,7 +637,3 @@ To prevent reproducibility failures and inflated performance metrics common in E
 ### Wearable BCI
 - Debener, S., Emkes, R., De Vos, M., & Bleichner, M. (2015). Unobtrusive ambulatory EEG using a smartphone and flexible printed electrodes around the ear. *Scientific Reports*, 5, 16743. [doi:10.1038/srep16743](https://doi.org/10.1038/srep16743)
 - Kosmyna, N., & Maes, P. (2019). AttentivU: An EEG-based closed-loop biofeedback system for real-time monitoring and improvement of engagement. *Extended Abstracts of the 2019 CHI Conference on Human Factors in Computing Systems*, 1–6. [doi:10.1145/3290607.3312999](https://doi.org/10.1145/3290607.3312999)
-
----
-
-> **Next Steps:** After review and approval of this experimental design, proceed to set up the Python environment and begin Phase 1 data loading and preprocessing pipeline implementation.
