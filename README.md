@@ -19,7 +19,8 @@
 8. [Evaluation & Statistical Analysis Plan](#8-evaluation--statistical-analysis-plan)
 9. [Risk Analysis & Mitigation](#9-risk-analysis--mitigation)
 10. [Computational Environment](#10-computational-environment)
-11. [References](#11-references)
+- [Appendix A: Methodological Foundations of Preprocessing Pipeline](#appendix-a-methodological-foundations-of-preprocessing-pipeline)
+- [Appendix B: Literature References](#appendix-b-literature-references)
 
 ---
 
@@ -203,109 +204,81 @@ dataset = Schirrmeister2017()
 ```
 Raw EEG (Continuous)
     │
-    ├─ [1] Load & Channel Selection [Jasper, 1958]
+    ├─ [1] Load & Channel Selection
     │       Select target montage subset or use full channels (International 10-20 standard)
     │
-    ├─ [2] Band-Pass Filter (Continuous) [Widmann et al., 2015]
+    ├─ [2] Band-Pass Filter (Continuous)
     │       ★ MUST filter before epoching to avoid edge ringing
     │       IIR Butterworth 4th order, zero-phase (filtfilt)
-    │       Passband: 4–40 Hz (DL: Schirrmeister et al., 2017) or 8–30 Hz (CSP/Riemannian: Lemm et al., 2011)
+    │       Passband: 4–40 Hz (broad for DL) or 8–30 Hz (CSP/Riemannian)
     │
-    ├─ [3] Notch Filter [Widmann et al., 2015]
+    ├─ [3] Notch Filter
     │       50 Hz (Korea/Europe) or 60 Hz (US), Q ≥ 30
     │
-    ├─ [4] Bad Channel Detection & Interpolation [Perrin et al., 1989]
+    ├─ [4] Bad Channel Detection & Interpolation
     │       Detect flat/noisy channels → spherical spline interpolation
     │       ★ MUST do before CAR to prevent noise injection
     │
-    ├─ [5] Re-Referencing [McFarland et al., 1997]
+    ├─ [5] Re-Referencing
     │       Common Average Reference (CAR) for ≥32 channels
     │       Or Surface Laplacian (CSD) for high spatial specificity
     │       ★ Never use Cz as reference for MI (extinguishes foot MI, distorts C3/C4)
     │
-    ├─ [6] ICA Artifact Removal [Ablin et al., 2018; Winkler et al., 2015]
+    ├─ [6] ICA Artifact Removal
     │       Algorithm: Picard (preconditioned fast ICA) or Extended Infomax
-    │       High-pass ≥1.0 Hz before ICA fitting (Winkler et al., 2015)
+    │       High-pass ≥1.0 Hz before ICA fitting
     │       Identify EOG components (correlation with Fp1/Fp2 > 0.4)
     │       ★ Fit ICA on training data only (no data leakage)
     │
-    ├─ [7] Epoching [Schirrmeister et al., 2017]
+    ├─ [7] Epoching
     │       Window: [0.5s, 4.0s] post-cue (avoid cue-evoked VEP in first 0.5s)
     │       Baseline: [-1.0s, 0.0s] relative to cue onset
     │
-    ├─ [8] Artifact Rejection [Jas et al., 2017]
+    ├─ [8] Artifact Rejection
     │       Peak-to-peak threshold: 80–120 µV (sensorimotor channels)
     │       Or use autoreject for automated Bayesian thresholding
     │
-    ├─ [9] Normalization [Schirrmeister et al., 2017; Varoquaux et al., 2017]
+    ├─ [9] Normalization
     │       Per-channel z-score (fit on training set only)
     │       Or Exponential Moving Standardization (EMS for Braindecode)
     │
-    └─ [10] Feature Extraction / Model Input [Lawhern et al., 2018; Lemm et al., 2011]
+    └─ [10] Feature Extraction / Model Input
             CSP: Covariance matrix → spatial filters → log-variance
             DL: Raw normalized epochs (1, C, T) tensor (resampled to 128/250 Hz)
 ```
 
-#### 5.1.1 Academic Foundations and Protocol Standards by Stage
-
-Each stage of the preprocessing workflow is derived from peer-reviewed signal processing principles and BCI benchmark standards:
-
-1. **Montage Specification & Channel Selection (`[1]`):**
-   - *Reference:* **Jasper (1958)**, *Electroencephalography and Clinical Neurophysiology*.
-   - *Methodological Basis:* Anatomical alignment conforms strictly to the International 10-20 electrode placement standard. Reproducible channel selection ensures geographic correspondence across subjects and allows precise spatial sub-sampling into progressive degradation tiers (T0–T6).
-2. **Continuous Band-Pass Filtering & Edge Ringing Prevention (`[2]`):**
-   - *References:* **Widmann et al. (2015)**, *Journal of Neuroscience Methods*; **Lemm et al. (2011)**, *NeuroImage*; **Schirrmeister et al. (2017)**, *Human Brain Mapping*.
-   - *Methodological Basis:* Filtering discrete, segmented epochs introduces severe non-causal boundary discontinuities and "edge ringing" artifacts into the trial window. Filtering must be performed continuously prior to epoching using a zero-phase forward-backward Butterworth filter (`filtfilt`, 4th order, $-24\text{ dB/octave}$) or linear-phase FIR filter. Passbands are tailored to the decoding architecture: 8–30 Hz isolates canonical sensorimotor mu and beta rhythms for CSP/Riemannian classifiers, while 4–40 Hz provides broadband temporal features for deep convolutional neural networks.
-3. **Notch Line-Noise Suppression (`[3]`):**
-   - *Reference:* **Widmann et al. (2015)**, *Journal of Neuroscience Methods*.
-   - *Methodological Basis:* Mains interference (50 Hz in Korea/Europe, 60 Hz in the US) introduces sharp narrow-band noise that can bias covariance estimators. A notch filter with quality factor $Q \ge 30$ eliminates line noise harmonics while preserving sensorimotor spectral density within adjacent frequency bins.
-4. **Bad Channel Detection & Spherical Spline Interpolation (`[4]`):**
-   - *Reference:* **Perrin et al. (1989)**, *Electroencephalography and Clinical Neurophysiology*.
-   - *Methodological Basis:* Non-functional, bridged, or excessively noisy electrodes inject variance into every clean channel if included in spatial averages. Damaged channels are identified via correlation thresholds ($r < 0.4$) and variance outliers, then reconstructed via 3D spherical spline interpolation using Legendre polynomials, ensuring smooth spatial scalp potential recovery before montage transformations.
-5. **Spatial Re-Referencing & Vertex (Cz) Bias Avoidance (`[5]`):**
-   - *Reference:* **McFarland et al. (1997)**, *Electroencephalography and Clinical Neurophysiology*.
-   - *Methodological Basis:* Ear/mastoid unipolar referencing often picks up temporal muscle noise. Common Average Reference (CAR) or Current Source Density (CSD / Surface Laplacian) acts as a spatial high-pass filter that accentuates local cortical generators over widespread volume conduction. Furthermore, referencing to the vertex ($C_z$) must be strictly avoided during motor imagery: $C_z$ directly overlies the homuncular foot motor area, extinguishing foot MI rhythms and distorting the contralateral dipole field between $C_3$ and $C_4$.
-6. **Independent Component Analysis (ICA) & Preconditioning (`[6]`):**
-   - *References:* **Winkler et al. (2015)**, *IEEE EMBC*; **Ablin et al. (2018)**, *IEEE TSP*.
-   - *Methodological Basis:* High-pass filtering at $\ge 1.0\text{ Hz}$ is mandatory prior to ICA decomposition because slow baseline drifts degrade component separation and convergence stability (Winkler et al., 2015). The Picard algorithm (Ablin et al., 2018) utilizes preconditioned L-BFGS approximations to converge orders of magnitude faster than standard Infomax while maintaining mathematical equivalence. ICA unmixing matrices are fitted strictly on training folds to prevent test artifact pattern leakage.
-7. **Post-Cue Epoching & Visual Evoked Potential (VEP) Exclusion (`[7]`):**
-   - *Reference:* **Schirrmeister et al. (2017)**, *Human Brain Mapping*.
-   - *Methodological Basis:* Visual cue presentation triggers an obligatory visual evoked potential (VEP) in the primary visual and parietal cortices during the first 0–500 ms post-cue. Truncating the analysis window to $[0.5\text{s}, 4.0\text{s}]$ post-cue eliminates visual stimulus confounds and isolates pure, endogenous sensorimotor rhythm (ERD/ERS) dynamics.
-8. **Automated Bayesian Artifact Rejection (`[8]`):**
-   - *Reference:* **Jas et al. (2017)**, *NeuroImage*.
-   - *Methodological Basis:* Arbitrary global amplitude thresholds (e.g., $100\ \mu\text{V}$) lead to either over-rejection of physiological transients or retention of localized channel bursts. The `autoreject` algorithm optimizes channel- and trial-specific thresholds through cross-validated Bayesian optimization, objectively pruning artifacts without manual analyst bias.
-9. **Leakage-Free Normalization & Exponential Moving Standardization (`[9]`):**
-   - *References:* **Schirrmeister et al. (2017)**, *Human Brain Mapping*; **Varoquaux et al. (2017)**, *NeuroImage*; **Varoquaux (2018)**, *NeuroImage*.
-   - *Methodological Basis:* Computing dataset-wide mean and standard deviation leaks test distribution statistics into model training. For traditional architectures, z-score parameters are fitted strictly inside training folds. For deep neural networks, Exponential Moving Standardization (EMS) computes causal, exponentially weighted running mean and variance to handle temporal non-stationarity across recording blocks.
-10. **Feature Dimension & Temporal Resampling (`[10]`):**
-    - *References:* **Lawhern et al. (2018)**, *Journal of Neural Engineering*; **Lemm et al. (2011)**, *NeuroImage*.
-    - *Methodological Basis:* Downsampling from original sampling rates (e.g., 500 Hz or 1000 Hz) to 128 Hz or 250 Hz preserves full fidelity for the Nyquist band (up to 64 Hz or 125 Hz, fully encompassing the 4–40 Hz SMR passband) while cutting convolution filter lengths, memory footprint, and gradient propagation steps by up to $75\%$.
+> [!NOTE]
+> For complete electrophysiological foundations, mathematical formulations, and literature citations for each preprocessing stage, see [Appendix A: Methodological Foundations of Preprocessing Pipeline](#appendix-a-methodological-foundations-of-preprocessing-pipeline).
 
 ### 5.2 Critical Anti-Patterns to Avoid
 
-| # | Anti-Pattern | Consequence | Correct Approach | Key Reference(s) |
-|:---:|:---|:---|:---|:---|
-| 1 | **Filtering after epoching** | Edge ringing artifacts and boundary discontinuity distortion | Filter continuous raw data first, then segment into epochs | Widmann et al. (2015) |
-| 2 | **Fitting CSP on full dataset** | Data leakage across folds → artificially inflated classification accuracy | Fit spatial filters strictly within training fold of each CV split | Lemm et al. (2011); Varoquaux et al. (2017); Varoquaux (2018) |
-| 3 | **Computing global z-score before split** | Leaks test distribution statistics (mean/variance) into training | Fit standardizers on training set only; apply transforms to test set | Lemm et al. (2011); Varoquaux et al. (2017); Varoquaux (2018) |
-| 4 | **Overlapping sliding windows split randomly** | Severe temporal autocorrelation leakage between adjacent slices | Split data at trial or recording session level first, then window | Lemm et al. (2011); Schirrmeister et al. (2017) |
-| 5 | **ICA fitted on train + test combined** | Distribution leakage of test artifact topologies into training models | Fit ICA unmixing matrices per-subject strictly on training data | Winkler et al. (2015); Varoquaux et al. (2017); Varoquaux (2018) |
-| 6 | **Using Cz as reference for MI** | Extinguishes foot MI signal, distorts contralateral C3/C4 dipole gradients | Re-reference to Common Average Reference (CAR) or Surface Laplacian | McFarland et al. (1997) |
-| 7 | **CAR with bad channels included** | High-amplitude sensor artifacts and drift injected into all clean channels | Detect and interpolate bad channels with spherical splines prior to CAR | Perrin et al. (1989); MNE-Python Guidelines (Gramfort et al., 2013); Clinical EEG Guidelines |
+| # | Anti-Pattern | Consequence | Correct Approach |
+|:---:|:---|:---|:---|
+| 1 | **Filtering after epoching** | Edge ringing artifacts and boundary discontinuity distortion | Filter continuous raw data first, then segment into epochs |
+| 2 | **Fitting CSP on full dataset** | Data leakage across folds → artificially inflated classification accuracy | Fit spatial filters strictly within training fold of each CV split |
+| 3 | **Computing global z-score before split** | Leaks test distribution statistics (mean/variance) into training | Fit standardizers on training set only; apply transforms to test set |
+| 4 | **Overlapping sliding windows split randomly** | Severe temporal autocorrelation leakage between adjacent slices | Split data at trial or recording session level first, then window |
+| 5 | **ICA fitted on train + test combined** | Distribution leakage of test artifact topologies into training models | Fit ICA unmixing matrices per-subject strictly on training data |
+| 6 | **Using Cz as reference for MI** | Extinguishes foot MI signal, distorts contralateral C3/C4 dipole gradients | Re-reference to Common Average Reference (CAR) or Surface Laplacian |
+| 7 | **CAR with bad channels included** | High-amplitude sensor artifacts and drift injected into all clean channels | Detect and interpolate bad channels with spherical splines prior to CAR |
+
+*Note: For detailed literature justifications and theoretical derivations behind anti-pattern prevention, see [Appendix A.2](#a2-methodological-justification-for-anti-pattern-prevention).*
 
 ### 5.3 Preprocessing Parameters Summary
 
-| Parameter | CSP/Riemannian Pipeline | Deep Learning Pipeline | Key Rationale & Primary Reference(s) |
-|:---|:---|:---|:---|
-| **Band-pass** | 8–30 Hz | 4–40 Hz | Classical SMR (mu/beta) isolation vs. broadband spectral feature learning in CNNs (Lemm et al., 2011; Schirrmeister et al., 2017) |
-| **Filter type** | Butterworth 4th order, zero-phase | FIR or Butterworth, zero-phase | Zero phase distortion (`filtfilt`), maximally flat passband response (Widmann et al., 2015) |
-| **Notch filter** | 50 Hz (EU/Asia) / 60 Hz (US), $Q \ge 30$ | 50 Hz (EU/Asia) / 60 Hz (US), $Q \ge 30$ | Suppresses electrical mains interference without distorting adjacent sensorimotor oscillations (Widmann et al., 2015) |
-| **Re-reference** | CAR | CAR | Spatial zero-sum reference preserving bilateral motor gradients without Cz electrode bias (McFarland et al., 1997) |
-| **Epoch window** | [0.5s, 3.5s] post-cue | [0.5s, 4.0s] post-cue | Discards initial 500 ms cue-onset VEP; isolates sustained motor imagery dynamics (Schirrmeister et al., 2017) |
-| **Baseline** | [-1.0s, 0.0s] subtractive | [-1.0s, 0.0s] subtractive | Pre-cue resting state baseline correction (Pfurtscheller & Lopes da Silva, 1999) |
-| **Artifact threshold** | 100 µV peak-to-peak | autoreject | Clinical fixed amplitude thresholding vs. cross-validated Bayesian learned sensor rejection (Jas et al., 2017) |
-| **Normalization** | None (CSP handles internally) | Per-channel z-score or EMS | Covariance normalization vs. Exponential Moving Standardization for non-stationary signals (Schirrmeister et al., 2017; Varoquaux et al., 2017) |
-| **Resample** | 250 Hz | 128 Hz (EEGNet) or 250 Hz | Nyquist coverage for 40 Hz passband while minimizing parameter count and training latency (Lawhern et al., 2018) |
+| Parameter | CSP/Riemannian Pipeline | Deep Learning Pipeline |
+|:---|:---|:---|
+| **Band-pass** | 8–30 Hz | 4–40 Hz |
+| **Filter type** | Butterworth 4th order, zero-phase | FIR or Butterworth, zero-phase |
+| **Notch filter** | 50 Hz (EU/Asia) / 60 Hz (US), $Q \ge 30$ | 50 Hz (EU/Asia) / 60 Hz (US), $Q \ge 30$ |
+| **Re-reference** | CAR | CAR |
+| **Epoch window** | [0.5s, 3.5s] post-cue | [0.5s, 4.0s] post-cue |
+| **Baseline** | [-1.0s, 0.0s] subtractive | [-1.0s, 0.0s] subtractive |
+| **Artifact threshold** | 100 µV peak-to-peak | autoreject |
+| **Normalization** | None (CSP handles internally) | Per-channel z-score or EMS |
+| **Resample** | 250 Hz | 128 Hz (EEGNet) or 250 Hz |
+
+*Note: For parameter selection derivations and benchmark literature rationales, see [Appendix A.3](#a3-preprocessing-parameter-rationales).*
 
 ---
 
@@ -567,7 +540,68 @@ scipy>=1.14.0
 
 ---
 
-## 11. References
+## Appendix A: Methodological Foundations of Preprocessing Pipeline
+
+### A.1 Stage-by-Stage Electrophysiological Foundations & Standards
+
+Each stage of the preprocessing workflow is derived from peer-reviewed signal processing principles and BCI benchmark standards:
+
+1. **Montage Specification & Channel Selection (`[1]`):**
+   - *Reference:* **Jasper (1958)**, *Electroencephalography and Clinical Neurophysiology*.
+   - *Methodological Basis:* Anatomical alignment conforms strictly to the International 10-20 electrode placement standard. Reproducible channel selection ensures geographic correspondence across subjects and allows precise spatial sub-sampling into progressive degradation tiers (T0–T6).
+2. **Continuous Band-Pass Filtering & Edge Ringing Prevention (`[2]`):**
+   - *References:* **Widmann et al. (2015)**, *Journal of Neuroscience Methods*; **Lemm et al. (2011)**, *NeuroImage*; **Schirrmeister et al. (2017)**, *Human Brain Mapping*.
+   - *Methodological Basis:* Filtering discrete, segmented epochs introduces severe non-causal boundary discontinuities and "edge ringing" artifacts into the trial window. Filtering must be performed continuously prior to epoching using a zero-phase forward-backward Butterworth filter (`filtfilt`, 4th order, $-24\text{ dB/octave}$) or linear-phase FIR filter. Passbands are tailored to the decoding architecture: 8–30 Hz isolates canonical sensorimotor mu and beta rhythms for CSP/Riemannian classifiers, while 4–40 Hz provides broadband temporal features for deep convolutional neural networks.
+3. **Notch Line-Noise Suppression (`[3]`):**
+   - *Reference:* **Widmann et al. (2015)**, *Journal of Neuroscience Methods*.
+   - *Methodological Basis:* Mains interference (50 Hz in Korea/Europe, 60 Hz in the US) introduces sharp narrow-band noise that can bias covariance estimators. A notch filter with quality factor $Q \ge 30$ eliminates line noise harmonics while preserving sensorimotor spectral density within adjacent frequency bins.
+4. **Bad Channel Detection & Spherical Spline Interpolation (`[4]`):**
+   - *Reference:* **Perrin et al. (1989)**, *Electroencephalography and Clinical Neurophysiology*.
+   - *Methodological Basis:* Non-functional, bridged, or excessively noisy electrodes inject variance into every clean channel if included in spatial averages. Damaged channels are identified via correlation thresholds ($r < 0.4$) and variance outliers, then reconstructed via 3D spherical spline interpolation using Legendre polynomials, ensuring smooth spatial scalp potential recovery before montage transformations.
+5. **Spatial Re-Referencing & Vertex (Cz) Bias Avoidance (`[5]`):**
+   - *Reference:* **McFarland et al. (1997)**, *Electroencephalography and Clinical Neurophysiology*.
+   - *Methodological Basis:* Ear/mastoid unipolar referencing often picks up temporal muscle noise. Common Average Reference (CAR) or Current Source Density (CSD / Surface Laplacian) acts as a spatial high-pass filter that accentuates local cortical generators over widespread volume conduction. Furthermore, referencing to the vertex ($C_z$) must be strictly avoided during motor imagery: $C_z$ directly overlies the homuncular foot motor area, extinguishing foot MI rhythms and distorting the contralateral dipole field between $C_3$ and $C_4$.
+6. **Independent Component Analysis (ICA) & Preconditioning (`[6]`):**
+   - *References:* **Winkler et al. (2015)**, *IEEE EMBC*; **Ablin et al. (2018)**, *IEEE TSP*.
+   - *Methodological Basis:* High-pass filtering at $\ge 1.0\text{ Hz}$ is mandatory prior to ICA decomposition because slow baseline drifts degrade component separation and convergence stability (Winkler et al., 2015). The Picard algorithm (Ablin et al., 2018) utilizes preconditioned L-BFGS approximations to converge orders of magnitude faster than standard Infomax while maintaining mathematical equivalence. ICA unmixing matrices are fitted strictly on training folds to prevent test artifact pattern leakage.
+7. **Post-Cue Epoching & Visual Evoked Potential (VEP) Exclusion (`[7]`):**
+   - *Reference:* **Schirrmeister et al. (2017)**, *Human Brain Mapping*.
+   - *Methodological Basis:* Visual cue presentation triggers an obligatory visual evoked potential (VEP) in the primary visual and parietal cortices during the first 0–500 ms post-cue. Truncating the analysis window to $[0.5\text{s}, 4.0\text{s}]$ post-cue eliminates visual stimulus confounds and isolates pure, endogenous sensorimotor rhythm (ERD/ERS) dynamics.
+8. **Automated Bayesian Artifact Rejection (`[8]`):**
+   - *Reference:* **Jas et al. (2017)**, *NeuroImage*.
+   - *Methodological Basis:* Arbitrary global amplitude thresholds (e.g., $100\ \mu\text{V}$) lead to either over-rejection of physiological transients or retention of localized channel bursts. The `autoreject` algorithm optimizes channel- and trial-specific thresholds through cross-validated Bayesian optimization, objectively pruning artifacts without manual analyst bias.
+9. **Leakage-Free Normalization & Exponential Moving Standardization (`[9]`):**
+   - *References:* **Schirrmeister et al. (2017)**, *Human Brain Mapping*; **Varoquaux et al. (2017)**, *NeuroImage*; **Varoquaux (2018)**, *NeuroImage*.
+   - *Methodological Basis:* Computing dataset-wide mean and standard deviation leaks test distribution statistics into model training. For traditional architectures, z-score parameters are fitted strictly inside training folds. For deep neural networks, Exponential Moving Standardization (EMS) computes causal, exponentially weighted running mean and variance to handle temporal non-stationarity across recording blocks.
+10. **Feature Dimension & Temporal Resampling (`[10]`):**
+    - *References:* **Lawhern et al. (2018)**, *Journal of Neural Engineering*; **Lemm et al. (2011)**, *NeuroImage*.
+    - *Methodological Basis:* Downsampling from original sampling rates (e.g., 500 Hz or 1000 Hz) to 128 Hz or 250 Hz preserves full fidelity for the Nyquist band (up to 64 Hz or 125 Hz, fully encompassing the 4–40 Hz SMR passband) while cutting convolution filter lengths, memory footprint, and gradient propagation steps by up to $75\%$.
+
+### A.2 Methodological Justification for Anti-Pattern Prevention
+
+To prevent reproducibility failures and inflated performance metrics common in EEG literature, the following design decisions are enforced:
+
+- **Continuous Filtering vs. Epoch Filtering:** Applying temporal filters to already-epoched segments induces Gibbs ringing artifacts near segment boundaries ($t = 0.5\text{s}$ and $t = 4.0\text{s}$), injecting false high-amplitude transient oscillations into the classifier. Filtering the continuous recording eliminates these boundary discontinuities (Widmann et al., 2015).
+- **Cross-Validation Integrity & Data Leakage Prevention:** In BCI decoders, computing spatial projections (CSP), normalization scalers (Z-score), or decomposition unmixing matrices (ICA) across both training and test sets leaks test-fold variance and distribution statistics into training (Lemm et al., 2011; Varoquaux et al., 2017; Varoquaux, 2018). All transformers must be wrapped within `sklearn.pipeline.Pipeline` or cross-validation folds.
+- **Trial-Level Slicing vs. Random Window Splitting:** Overlapping sliding windows extracted from the same continuous trial exhibit strong temporal autocorrelation. Randomly shuffling these windows into train and test splits allows the network to memorize temporal trajectories rather than learning generalized neural patterns, yielding spuriously elevated accuracy (Schirrmeister et al., 2017).
+- **Electrode Referencing Dynamics:** Unipolar recording with a vertex reference ($C_z$) artificially zeros the potential at the exact location of the lower-limb motor homunculus and distorts the bi-hemispheric differential voltage gradient between $C_3$ and $C_4$. Implementing CAR or Surface Laplacian computes an objective spatial zero-sum reference (McFarland et al., 1997).
+- **Spline Interpolation Prior to Spatial Averaging:** Including a high-impedance or disconnected channel in Common Average Referencing redistributes that channel's noise into every clean electrode across the scalp montage. Bad channel detection and spherical spline interpolation must strictly precede CAR (Perrin et al., 1989; Gramfort et al., 2013).
+
+### A.3 Preprocessing Parameter Rationales
+
+| Parameter | Pipeline | Specification | Literature Rationale |
+|:---|:---|:---|:---|
+| **Passband** | CSP / Riemannian | 8–30 Hz | Encompasses canonical sensorimotor mu (8–12 Hz) and beta (16–28 Hz) desynchronization bands while discarding delta/theta drifts and high-frequency EMG (Lemm et al., 2011). |
+| **Passband** | Deep Learning | 4–40 Hz | Provides broadband representation, allowing spatial-temporal convolutional layers to learn customized filter banks and cross-frequency couplings (Schirrmeister et al., 2017). |
+| **Filter Order** | Both | 4th order Butterworth | Balances sharp frequency roll-off ($-24\text{ dB/octave}$) with minimal filter order to avoid phase non-linearities and instability (Widmann et al., 2015). |
+| **Epoch Window** | CSP / Riemannian | [0.5s, 3.5s] post-cue | Focuses on stable sustained motor imagery duration; truncates before trial termination cues (Pfurtscheller & Lopes da Silva, 1999). |
+| **Epoch Window** | Deep Learning | [0.5s, 4.0s] post-cue | Provides longer temporal context (3.5 s / 448 samples at 128 Hz) for receptive field coverage in temporal convolutions (Schirrmeister et al., 2017; Lawhern et al., 2018). |
+| **Baseline Window** | Both | [-1.0s, 0.0s] pre-cue | Captures true pre-stimulus resting state ERD reference without contamination from visual fixation cues (Pfurtscheller & Lopes da Silva, 1999). |
+| **Downsampling** | EEGNet | 128 Hz | Lowers input dimensionality to length 448 per trial, dramatically reducing parameter count in temporal kernels while retaining full fidelity up to 64 Hz Nyquist (Lawhern et al., 2018). |
+
+---
+
+## Appendix B: Literature References
 
 ### Datasets
 - Lee, M.-H., Kwon, O.-Y., Kim, Y.-J., Kim, H.-K., Lee, Y.-E., Williamson, J., Fazli, S., & Lee, S.-W. (2019). EEG dataset and OpenBMI toolbox for three BCI paradigms: An investigation into BCI illiteracy. *GigaScience*, 8(5), giz002. [doi:10.1093/gigascience/giz002](https://doi.org/10.1093/gigascience/giz002)
